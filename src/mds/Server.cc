@@ -2337,10 +2337,89 @@ void Server::set_trace_dist(const ref_t<MClientReply> &reply,
   reply->set_trace(bl);
 }
 
+/**
+ * @brief new function to add request's full path in the log.
+ * @author peng dengfu(286233670@qq.com) 
+ * @param out 
+ * @param req 
+ * @return std::stringstream& 
+ */
+std::stringstream& Server::print_request(std::stringstream& out ,const MClientRequest::const_ref &req){
+    out << "client_request_ppppp(" << req->get_orig_source()
+	      << ":" << req->get_tid()  << " " << ceph_mds_op_name(req->get_op());
+    if (req->head.op == CEPH_MDS_OP_GETATTR)
+      out << " " << ccap_string(req->head.args.getattr.mask);
+    if (req->head.op == CEPH_MDS_OP_SETATTR) {
+      if (req->head.args.setattr.mask & CEPH_SETATTR_MODE)
+	      out << " mode=0" << std::oct << req->head.args.setattr.mode << std::dec;
+      if (req->head.args.setattr.mask & CEPH_SETATTR_UID)
+	      out << " uid=" << req->head.args.setattr.uid;
+      if (req->head.args.setattr.mask & CEPH_SETATTR_GID)
+	      out << " gid=" << req->head.args.setattr.gid;
+      if (req->head.args.setattr.mask & CEPH_SETATTR_SIZE)
+	      out << " size=" << req->head.args.setattr.size;
+      if (req->head.args.setattr.mask & CEPH_SETATTR_MTIME)
+	      out << " mtime=" << utime_t(req->head.args.setattr.mtime);
+      if (req->head.args.setattr.mask & CEPH_SETATTR_ATIME)
+	      out << " atime=" << utime_t(req->head.args.setattr.atime);
+    }
+    if (req->head.op == CEPH_MDS_OP_SETFILELOCK ||
+	      req->head.op == CEPH_MDS_OP_GETFILELOCK) {
+      out << " rule " << (int)req->head.args.filelock_change.rule
+	  << ", type " << (int)req->head.args.filelock_change.type
+	  << ", owner " << req->head.args.filelock_change.owner
+	  << ", pid " << req->head.args.filelock_change.pid
+	  << ", start " << req->head.args.filelock_change.start
+	  << ", length " << req->head.args.filelock_change.length
+	  << ", wait " << (int)req->head.args.filelock_change.wait;
+    }
+
+    if (!req->get_filepath2().empty()){
+        filepath path = req->get_filepath2();
+        CInode *cur = mdcache->get_inode(path.get_ino());
+        
+        std::string fullpath;
+        cur->make_path_string(fullpath, true);
+        out << " \"" << fullpath << '/'  << path.get_path() << "\"";
+    }
+
+    if (!req->get_filepath().empty()){
+        filepath path = req->get_filepath();
+        CInode *cur = mdcache->get_inode(path.get_ino());
+       
+        std::string fullpath;
+        cur->make_path_string(fullpath, true);
+        out << " \"" << fullpath << '/'  << path.get_path() << "\"";
+    }
+
+    if (req->stamp != utime_t())
+      out << " " << req->stamp;
+    if (req->head.num_retry)
+      out << " RETRY=" << (int)req->head.num_retry;
+    if (req->get_flags() & CEPH_MDS_FLAG_REPLAY)
+      out << " REPLAY";
+    if (req->queued_for_replay)
+      out << " QUEUED_FOR_REPLAY";
+    out << " caller_uid=" << req->head.caller_uid
+	<< ", caller_gid=" << req->head.caller_gid
+	<< '{';
+    for (auto i = req->gid_list.begin(); i != req->gid_list.end(); ++i)
+      out << *i << ',';
+    out << '}'
+	<< ")";
+  return out;
+  }
+
 void Server::handle_client_request(const cref_t<MClientRequest> &req)
 {
   dout(4) << "handle_client_request " << *req << dendl;
 
+  //get full path --------start----------  
+  std::stringstream reqSs;
+  print_request(reqSs,req);
+  dout(1) << reqSs.str() <<  dendl;
+  //get full path --------end-------------
+	
   if (mds->logger)
     mds->logger->inc(l_mds_request);
   if (logger)
