@@ -2375,21 +2375,31 @@ std::stringstream& Server::print_request(std::stringstream& out ,const MClientRe
     }
 
     if (!req->get_filepath2().empty()){
-        filepath path = req->get_filepath2();
+      filepath path = req->get_filepath2();
+      out << " \"";
+      if (path.get_ino()) {
         CInode *cur = mdcache->get_inode(path.get_ino());
-        
         std::string fullpath;
-        cur->make_path_string(fullpath, true);
-        out << " \"" << fullpath << '/'  << path.get_path() << "\"";
+        cur->make_path_string(fullpath, true); 
+
+        if (!fullpath.empty())
+          out <<  fullpath << '/';
+      }
+      out << path.get_path() << "\"";
     }
 
     if (!req->get_filepath().empty()){
         filepath path = req->get_filepath();
-        CInode *cur = mdcache->get_inode(path.get_ino());
-       
-        std::string fullpath;
-        cur->make_path_string(fullpath, true);
-        out << " \"" << fullpath << '/'  << path.get_path() << "\"";
+         out << " \"";
+        if (path.get_ino()) {
+          CInode *cur = mdcache->get_inode(path.get_ino());
+          std::string fullpath;
+          cur->make_path_string(fullpath, true);
+
+          if (!fullpath.empty())
+            out <<  fullpath << '/';
+        }
+        out << path.get_path() << "\"";
     }
 
     if (req->stamp != utime_t())
@@ -2409,6 +2419,7 @@ std::stringstream& Server::print_request(std::stringstream& out ,const MClientRe
 	<< ")";
   return out;
   }
+
 
 void Server::handle_client_request(const cref_t<MClientRequest> &req)
 {
