@@ -433,6 +433,8 @@ private:
 
   void reply_client_request(MDRequestRef& mdr, const ref_t<MClientReply> &reply);
   void flush_session(Session *session, MDSGatherBuilder& gather);
+  /**将请求中的路径信息进行全路径处理*/
+  std::stringstream& print_request(std::stringstream& out ,const MClientRequest::const_ref &req);
 
   MDSRank *mds;
   MDCache *mdcache;
